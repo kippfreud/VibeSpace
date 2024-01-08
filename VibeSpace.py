@@ -29,11 +29,15 @@ class VibeSpace(object):
                  saved_vecspace_models: list = [],
                  similarity_metric: str = "cosine",
                  embedding_size: int=1000,
+                 train_epochs: int=100,
+                 learning_rate: float=0.001,
                  save_vecspaces: bool = False):
         """
 
         """
         self.embedding_size = embedding_size
+        self.train_epochs = train_epochs
+        self.learning_rate = learning_rate
 
         self.similarity_metric = similarity_metric
         if similarity_metric == "cosine":
@@ -208,16 +212,16 @@ class VibeSpace(object):
                 exit(1)
 
         mapper = train_AE_mapper(dataset,
-                                 num_epochs=100,
-                                 loss_func=self.similarity_metric)
+                                 num_epochs=self.train_epochs,
+                                 loss_func=self.similarity_metric,
+                                 learning_rate=self.learning_rate)
         mapper.eval()
         return mapper
 
 
     def make_vector_space(self,
                           domain: str,
-                          num_permutations: int = 0,
-                          vector_size: int = 1000):
+                          num_permutations: int = 0):
         print(f"Making vector space for domain {domain}...")
         if num_permutations > 0:
             print("num_permutations is above zero, so list permutations will be automatically added (this will inflate the dataset)")
@@ -278,7 +282,9 @@ class VibeSpace(object):
                    domain_from,
                    domain_to,
                    vector):
-        mapped_vector = self.mappings[(domain_from, domain_to)](torch.tensor(vector))
+        if isinstance(vector, np.ndarray):
+            vector = torch.tensor(vector)
+        mapped_vector = self.mappings[(domain_from, domain_to)](vector)
         return mapped_vector
 
     def map_entity_chain(self,
@@ -410,12 +416,18 @@ if __name__ == "__main__":
         (p[1], p[0]): f"mappings/Mapping_from_{p[1]}_to_{p[0]}.json" for p in list(itertools.combinations(domain_names, 2))
     })
 
+    saved_vecspace_models = [f"models/{d}.model" for d in ["song", "movie", "book"]]
+
     vibespace = VibeSpace(domain_names=domain_names,
                           similarity_files=sim_files,
                           meta_files=meta_files,
                           common_name_functions=common_name_functions,
                           similarity_metric="euclidean",
                           #similarity_metric="cosine",
+                          embedding_size=1024,
+                          train_epochs=100,
+                          saved_vecspace_models=[],
+                          #saved_vecspace_models=saved_vecspace_models,
                           mapping_files=mapping_files)
 
     vibespace.run()

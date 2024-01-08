@@ -45,7 +45,8 @@ if __name__ == "__main__":
                           common_name_functions=common_name_functions,
                           mapping_files=mapping_files,
                           similarity_metric="euclidean",
-                          embedding_size=10000,
+                          embedding_size=2048,
+                          train_epochs=100,
                           saved_vecspace_models=[])
 
 
