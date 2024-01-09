@@ -5,6 +5,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 import random
 import numpy as np
+import os
 
 class MapDataset(Dataset):
     def __init__(self, data):
@@ -34,7 +35,7 @@ class Autoencoder(nn.Module):
         # Encoder
         self.encoder_1 = nn.Linear(n, int(n/4))
         self.encoder_2 = nn.Linear(int(n/4), int(n/16))
-        #self.encoder_1 = nn.Linear(n, int(n/16))
+        # self.encoder_1 = nn.Linear(n, int(n/16))
         # Decoder
         self.decoder_1 = nn.Linear(int(n/16), int(n/4))
         self.decoder_2 = nn.Linear(int(n/4), n)
@@ -55,18 +56,27 @@ def train_AE_mapper(dataset,
                     num_epochs: int = 50,
                     batch_size: int = 64,
                     learning_rate: float = 0.001,
-                    loss_func: str = "cosine"):
+                    loss_func: str = "cosine",
+                    model_path=None,
+                    load_map=False):
     # Initialize your custom dataset
     random.shuffle(dataset)
     vibe_vector_size = dataset[0]["input"].shape[0]
+
+    # Model, optimizer, and loss function
+    model = Autoencoder(vibe_vector_size)
+    if load_map and model_path is not None:
+        if os.path.isfile(model_path):
+            model.load_state_dict(torch.load(model_path))
+            return model
+        else:
+            print("Can't load model, retraining")
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
     train_dataset = MapDataset(dataset[:round(len(dataset) * train_raio)])
     val_dataset = MapDataset(dataset[round(len(dataset) * train_raio):])
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size)
-
-    # Model, optimizer, and loss function
-    model = Autoencoder(vibe_vector_size)
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     if loss_func == "cosine":
         cos_emb_loss = nn.CosineEmbeddingLoss()
@@ -124,6 +134,8 @@ def train_AE_mapper(dataset,
 
         # Print losses
         print(f'Epoch [{epoch + 1}/{num_epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
+    if model_path is not None:
+        torch.save(model.state_dict(), model_path)
     return model
     # best_val = None
     # # Training loop

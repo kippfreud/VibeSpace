@@ -45,23 +45,26 @@ if __name__ == "__main__":
                           common_name_functions=common_name_functions,
                           mapping_files=mapping_files,
                           similarity_metric="euclidean",
-                          embedding_size=2048,
+                         # embedding_size=1024,
+                          embedding_size=1024,
                           train_epochs=100,
-                          saved_vecspace_models=[])
+                          saved_vecspace_models=saved_vecspace_models,
+                          #saved_vecspace_models=[],
+                          load_mapper_weights=False)
 
 
-    AB_list = [
-        ('book', 'movie'),
-        ('book', 'song'),
-        ('movie', 'book'),
-        ('movie', 'song'),
-        ('song', 'book'),
-        ('song', 'movie')
-    ]
-    for ab in AB_list:
-        print(ab)
-        vibespace.aba_metric(ab[0], ab[1])
-        vibespace.aba_metric_identity(ab[0], ab[1])
+    # AB_list = [
+    #     ('book', 'movie'),
+    #     ('book', 'song'),
+    #     ('movie', 'book'),
+    #     ('movie', 'song'),
+    #     ('song', 'book'),
+    #     ('song', 'movie')
+    # ]
+    # for ab in AB_list:
+    #     print(ab)
+    #     vibespace.aba_metric(ab[0], ab[1])
+    #     vibespace.aba_metric_identity(ab[0], ab[1])
 
     ABC_list = [
         ('book', 'song', 'movie'),

@@ -5,6 +5,12 @@ import itertools
 import gensim.models
 import torch
 import numpy as np
+import umap
+from sklearn.manifold import TSNE
+
+import matplotlib
+matplotlib.use("TkAgg")
+import matplotlib.pyplot as plt
 
 from utils import Corpus, CosineSimilarity, EuclideanSimilarity
 from mapper_utils import train_AE_mapper
@@ -27,6 +33,7 @@ class VibeSpace(object):
                  common_name_functions: list,
                  mapping_files: dict,
                  saved_vecspace_models: list = [],
+                 load_mapper_weights: bool=False,
                  similarity_metric: str = "cosine",
                  embedding_size: int=1000,
                  train_epochs: int=100,
@@ -38,6 +45,7 @@ class VibeSpace(object):
         self.embedding_size = embedding_size
         self.train_epochs = train_epochs
         self.learning_rate = learning_rate
+        self.load_mapper_weights = load_mapper_weights
 
         self.similarity_metric = similarity_metric
         if similarity_metric == "cosine":
@@ -73,6 +81,23 @@ class VibeSpace(object):
                 domain_names[i]: gensim.models.Word2Vec.load(saved_vecspace_models[i])for i in range(len(domain_names))
             }
 
+        # UMAP dimensionality reduction
+        self.reduced_vibespaces = {d: umap.UMAP(
+            n_neighbors=5,
+            min_dist=0.001
+        ).fit_transform(self.vibespaces[d].wv.vectors) for d in domain_names}
+        # TSNE dimensionality reduction
+        # self.reduced_vibespaces = {d: TSNE(
+        #     n_components=2,
+        #     learning_rate='auto',
+        #     init='random',
+        #     perplexity=30.0,
+        #     random_state=42
+        # ).fit_transform(self.vibespaces[d].wv.vectors) for d in domain_names}
+        # No dim reduction
+        # self.reduced_vibespaces = {d: self.vibespaces[d].wv.vectors for d in domain_names}
+
+        #self.plot_reduced_maps()
 
         # We now make all the mappings
         self.mappings = {
@@ -85,24 +110,94 @@ class VibeSpace(object):
     # Public Functions
     # -----------------------------------------------------------------------------
 
-    # METRICS
+    def plot_reduced_maps(self):
+        for d in self.domain_names:
+            plt.scatter(
+                self.reduced_vibespaces[d][:, 0],
+                self.reduced_vibespaces[d][:, 1],
+            )
+            plt.gca().set_aspect('equal', 'datalim')
+            plt.title(f'UMAP projection of the {d} domain', fontsize=24);
+            plt.show()
 
+    def f7(self, seq):
+        seen = set()
+        seen_add = seen.add
+        return [x for x in seq if not (x in seen or seen_add(x))]
+
+    def visualize_mapping(self, domain_chain, entity_chain, title=None):
+        assert len(domain_chain) == len(entity_chain), "Entity chain and domain chain must be the same length"
+        domains = self.f7(domain_chain)
+        num_domains = len(domains)
+        index_chain = [self.vibespaces[domain_chain[i]].wv.key_to_index[entity_chain[i]] for i in range(len(entity_chain))]
+        if num_domains > 3:
+            print("ERROR: I don't know how to plot this many domains...")
+            exit(1)
+        plotmaps = {
+            domains[0]: self.reduced_vibespaces[domains[0]],
+            domains[1]: self.reduced_vibespaces[domains[1]] + np.array([3*np.max(self.reduced_vibespaces[domains[0]]),0])#mp.max(self.reduced_vibespaces[domains[0]])[0]
+        }
+        #plt.scatter(plotmaps[domains[0]][:,0], plotmaps[domains[0]][:,1], c="green")
+        plt.scatter(plotmaps[domains[1]][:,0], plotmaps[domains[1]][:,1], c="blue")
+        if num_domains == 3:
+            plotmaps[domains[2]] = self.reduced_vibespaces[domains[2]] + np.array([1.5*np.max(self.reduced_vibespaces[domains[0]]), 3*np.max(self.reduced_vibespaces[domains[0]])])
+            plt.scatter(plotmaps[domains[2]][:,0], plotmaps[domains[2]][:,1], c="red")
+        sim_rank = np.flip(np.argsort(
+            [self.similarity_module.get_similarity(self.vibespaces[domain_chain[0]].wv.vectors[index_chain[0]], v) for v
+             in self.vibespaces[domain_chain[0]].wv.vectors]))
+        cmap = np.linspace(1, 0, len(sim_rank))#[sim_rank]
+        plt.scatter(plotmaps[domain_chain[0]][sim_rank[:]][:, 0], plotmaps[domain_chain[0]][sim_rank[:]][:, 1], c=cmap[:])
+        for i in range(1,len(domain_chain)):
+            start_xy = plotmaps[domain_chain[i-1]][index_chain[i-1]]
+            plt.text(start_xy[0], start_xy[1], entity_chain[i-1])
+            end_xy = plotmaps[domain_chain[i]][index_chain[i]]
+            dxdy = end_xy - start_xy
+            plt.arrow(start_xy[0], start_xy[1], dxdy[0], dxdy[1])
+        plt.text(end_xy[0], end_xy[1], entity_chain[-1])
+        if title is not None:
+            plt.title(title)
+        plt.show()
+
+    # -----------------------------------------------------------------------------
+    # Plotting Functions
+    # -----------------------------------------------------------------------------
+
+    def get_similarity_percentile(self,
+                                  domain_a: str,
+                                  vec_a: np.ndarray,
+                                  vec_a_dash: np.ndarray):
+        sims = [self.similarity_module.get_similarity(vec_a, v) for v in self.vibespaces[domain_a].wv.vectors]
+        s_star = self.similarity_module.get_similarity(vec_a, vec_a_dash)
+        percentile = len([d for d in sims if d<s_star])/len(sims)
+        return percentile
+
+    # METRICS
     def aba_metric(self,
                    domain_a:str,
                    domain_b:str):
         assert domain_a in self.domain_names, "domain_a is not a known domain"
         assert domain_b in self.domain_names, "domain_b is not a known domain"
         similarities = []
-        for e_a in tqdm(self.vibespaces[domain_a].wv.index_to_key[:1000]):
+        percentiles = []
+        #for e_a in tqdm(self.vibespaces[domain_a].wv.index_to_key[:1000]):
+        for e_a_i in range(1000):
+            e_a = self.vibespaces[domain_a].wv.index_to_key[e_a_i]
             vec_a = self.get_vector(domain_a, e_a)
             vec_b = self.map_entity(domain_a, domain_b, e_a)
             e_b, _ = self.get_most_similar_entity_from_vector(domain_b, vec_b)
             vec_a_dash = self.map_entity(domain_b, domain_a, e_b)
+            print(vec_a_dash)
             e_a_dash, _ = self.get_most_similar_entity_from_vector(domain_a, vec_a_dash)
             vec_a_dash = self.get_vector(domain_a, e_a_dash)
-            similarities.append(self.similarity_module.get_similarity(vec_a, vec_a_dash))
+            sim = self.similarity_module.get_similarity(vec_a, vec_a_dash)
+            similarities.append(sim)
+            per = self.get_similarity_percentile(domain_a, vec_a, vec_a_dash)
+            percentiles.append(per)
+            title = f"Entity {e_a} -> {e_b} -> {e_a_dash} is closer than {per:.2f}% of other {domain_a}'s: similarity={sim:.2f}"
+            print(title)
+            self.visualize_mapping((domain_a, domain_b, domain_a), (e_a, e_b, e_a_dash), title=title)
         print(f"METRIC RESULTS FOR {domain_a}->{domain_b}->{domain_a}")
-        print(f"Average similarity between A and A' where A->B->A' is {np.mean(similarities)}")
+        print(f"Average similarity between A and A' where A->B->A' is {np.mean(percentiles)}")
 
     def abca_metric(self,
                    domain_a:str,
@@ -112,7 +207,9 @@ class VibeSpace(object):
         assert domain_b in self.domain_names, "domain_b is not a known domain"
         assert domain_c in self.domain_names, "domain_c is not a known domain"
         similarities = []
-        for e_a in tqdm(self.vibespaces[domain_a].wv.index_to_key[:1000]):
+        percentiles = []
+        for e_a_i in range(1000):
+            e_a = self.vibespaces[domain_a].wv.index_to_key[e_a_i]
             vec_a = self.get_vector(domain_a, e_a)
             vec_b = self.map_entity(domain_a, domain_b, e_a)
             e_b, _ = self.get_most_similar_entity_from_vector(domain_b, vec_b)
@@ -121,9 +218,15 @@ class VibeSpace(object):
             vec_a_dash = self.map_entity(domain_c, domain_a, e_c)
             e_a_dash, _ = self.get_most_similar_entity_from_vector(domain_a, vec_a_dash)
             vec_a_dash = self.get_vector(domain_a, e_a_dash)
-            similarities.append(self.similarity_module.get_similarity(vec_a, vec_a_dash))
+            sim = self.similarity_module.get_similarity(vec_a, vec_a_dash)
+            similarities.append(sim)
+            per = self.get_similarity_percentile(domain_a, vec_a, vec_a_dash)
+            percentiles.append(per)
+            title = f"Entity {e_a} -> {e_b} -> {e_c} -> {e_a_dash} is closer than {per*100: .2f}% of other {domain_a}'s"
+            print(title)
+            self.visualize_mapping((domain_a, domain_b, domain_c, domain_a), (e_a, e_b, e_c, e_a_dash), title=title)
         print(f"METRIC RESULTS FOR {domain_a}->{domain_b}->{domain_c}->{domain_a}")
-        print(f"Average similarity between A and A' where A->B->C->A' is {np.mean(similarities)}")
+        print(f"Average similarity between A and A' where A->B->C->A' is {np.mean(percentiles)}")
 
     def aba_metric_identity(self,
                             domain_a:str,
@@ -131,7 +234,9 @@ class VibeSpace(object):
         assert domain_a in self.domain_names, "domain_a is not a known domain"
         assert domain_b in self.domain_names, "domain_b is not a known domain"
         similarities = []
-        for e_a in tqdm(self.vibespaces[domain_a].wv.index_to_key[:1000]):
+        percentiles = []
+        for e_a_i in range(1000):
+            e_a = self.vibespaces[domain_a].wv.index_to_key[e_a_i]
             vec_a = self.get_vector(domain_a, e_a)
             vec_b = vec_a
             e_b, _ = self.get_most_similar_entity_from_vector(domain_b, vec_b)
@@ -139,8 +244,11 @@ class VibeSpace(object):
             e_a_dash, _ = self.get_most_similar_entity_from_vector(domain_a, vec_a_dash)
             vec_a_dash = self.get_vector(domain_a, e_a_dash)
             similarities.append(self.similarity_module.get_similarity(vec_a, vec_a_dash))
+            per = self.get_similarity_percentile(domain_a, vec_a, vec_a_dash)
+            percentiles.append(per)
+            print(f"Entity {e_a} -> {e_b} -> {e_a_dash} is closer than {per}% of other {domain_a}'s")
         print(f"IDENTITY METRIC RESULTS FOR {domain_a}->{domain_b}->{domain_a}")
-        print(f"IDENTITY: Average similarity between A and A' where A->B->A' is {np.mean(similarities)}")
+        print(f"IDENTITY: Average similarity between A and A' where A->B->A' is {np.mean(percentiles)}")
 
     def abca_metric_identity(self,
                             domain_a:str,
@@ -150,7 +258,9 @@ class VibeSpace(object):
         assert domain_b in self.domain_names, "domain_b is not a known domain"
         assert domain_c in self.domain_names, "domain_c is not a known domain"
         similarities = []
-        for e_a in tqdm(self.vibespaces[domain_a].wv.index_to_key[:1000]):
+        percentiles = []
+        for e_a_i in range(1000):
+            e_a = self.vibespaces[domain_a].wv.index_to_key[e_a_i]
             vec_a = self.get_vector(domain_a, e_a)
             vec_b = vec_a
             e_b, _ = self.get_most_similar_entity_from_vector(domain_b, vec_b)
@@ -160,8 +270,11 @@ class VibeSpace(object):
             e_a_dash, _ = self.get_most_similar_entity_from_vector(domain_a, vec_a_dash)
             vec_a_dash = self.get_vector(domain_a, e_a_dash)
             similarities.append(self.similarity_module.get_similarity(vec_a, vec_a_dash))
+            per = self.get_similarity_percentile(domain_a, vec_a, vec_a_dash)
+            percentiles.append(per)
+            print(f"Entity {e_a} -> {e_b} -> {e_c} -> {e_a_dash} is closer than {per}% of other {domain_a}'s")
         print(f"IDENTITY METRIC RESULTS FOR {domain_a}->{domain_b}->{domain_c}->{domain_a}")
-        print(f"IDENTITY: Average similarity between A and A' where A->B->C->A' is {np.mean(similarities)}")
+        print(f"IDENTITY: Average similarity between A and A' where A->B->C->A' is {np.mean(percentiles)}")
 
     # NON - METRICS
 
@@ -214,7 +327,9 @@ class VibeSpace(object):
         mapper = train_AE_mapper(dataset,
                                  num_epochs=self.train_epochs,
                                  loss_func=self.similarity_metric,
-                                 learning_rate=self.learning_rate)
+                                 learning_rate=self.learning_rate,
+                                 model_path=f"mapping_models/{map_pair[0]}_to_{map_pair[1]}.pt",
+                                 load_map=self.load_mapper_weights)
         mapper.eval()
         return mapper
 
@@ -418,16 +533,20 @@ if __name__ == "__main__":
 
     saved_vecspace_models = [f"models/{d}.model" for d in ["song", "movie", "book"]]
 
+    #saved_map_weights = [f"mapping_models/{d1}_to_{d2}.pt" for d1 in ["song", "movie", "book"] for ]
+
     vibespace = VibeSpace(domain_names=domain_names,
                           similarity_files=sim_files,
                           meta_files=meta_files,
                           common_name_functions=common_name_functions,
                           similarity_metric="euclidean",
                           #similarity_metric="cosine",
-                          embedding_size=1024,
+                          embedding_size=2,
                           train_epochs=100,
                           saved_vecspace_models=[],
                           #saved_vecspace_models=saved_vecspace_models,
+                          #load_mapper_weights=True,
+                          load_mapper_weights=False,
                           mapping_files=mapping_files)
 
     vibespace.run()
