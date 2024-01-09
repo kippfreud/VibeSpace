@@ -25,7 +25,7 @@ class MapDataset(Dataset):
         output = random.choice(outputs)
         #output = outputs[0]
         out = output + np.random.normal(0,0.1,output.shape[0])
-        return torch.tensor(input), torch.tensor(out, dtype=torch.float32)
+        return torch.tensor(input, device='cuda'), torch.tensor(out, dtype=torch.float32, device='cuda')
 
 
 # Define the autoencoder model
@@ -64,7 +64,7 @@ def train_AE_mapper(dataset,
     vibe_vector_size = dataset[0]["input"].shape[0]
 
     # Model, optimizer, and loss function
-    model = Autoencoder(vibe_vector_size)
+    model = Autoencoder(vibe_vector_size).cuda()
     if load_map and model_path is not None:
         if os.path.isfile(model_path):
             model.load_state_dict(torch.load(model_path))
@@ -99,6 +99,9 @@ def train_AE_mapper(dataset,
         model.train()
         total_train_loss = 0
         for data, labels in train_loader:
+            data = data.to('cuda')
+            labels = labels.to('cuda')
+
             optimizer.zero_grad()
             reconstructions = model(data)
             loss = loss_function(reconstructions, labels)
