@@ -34,20 +34,20 @@ class Autoencoder(nn.Module):
         super(Autoencoder, self).__init__()
         # Encoder
         self.encoder_1 = nn.Linear(n, int(n/4))
-        self.encoder_2 = nn.Linear(int(n/4), int(n/16))
+        self.encoder_2 = nn.Linear(int(n/4), int(n/8))
         # self.encoder_1 = nn.Linear(n, int(n/16))
         # Decoder
-        self.decoder_1 = nn.Linear(int(n/16), int(n/4))
+        self.decoder_1 = nn.Linear(int(n/8), int(n/4))
         self.decoder_2 = nn.Linear(int(n/4), n)
         #self.decoder_2 = nn.Linear(int(n/16), n)
 
     def forward(self, x):
         x = self.encoder_1(x)
-        x = F.relu(x)
+        x = F.leaky_relu(x)
         x = self.encoder_2(x)
-        x = F.relu(x)
+        x = F.leaky_relu(x)
         x = self.decoder_1(x)
-        x = F.relu(x)
+        x = F.leaky_relu(x)
         x = self.decoder_2(x)
         return x
 

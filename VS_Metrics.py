@@ -46,25 +46,27 @@ if __name__ == "__main__":
                           mapping_files=mapping_files,
                           similarity_metric="euclidean",
                          # embedding_size=1024,
-                          embedding_size=1024,
+                          embedding_size=512,
                           train_epochs=100,
                           saved_vecspace_models=saved_vecspace_models,
                           #saved_vecspace_models=[],
-                          load_mapper_weights=False)
+                          num_permutations=10,
+                          load_mapper_weights=True)
 
 
-    # AB_list = [
-    #     ('book', 'movie'),
-    #     ('book', 'song'),
-    #     ('movie', 'book'),
-    #     ('movie', 'song'),
-    #     ('song', 'book'),
-    #     ('song', 'movie')
-    # ]
-    # for ab in AB_list:
-    #     print(ab)
-    #     vibespace.aba_metric(ab[0], ab[1])
-    #     vibespace.aba_metric_identity(ab[0], ab[1])
+    AB_list = [
+        ('book', 'movie'),
+        ('book', 'song'),
+        ('movie', 'book'),
+        ('movie', 'song'),
+        ('song', 'book'),
+        ('song', 'movie')
+    ]
+    for ab in AB_list:
+        print(ab)
+        vibespace.aba_metric(ab[0], ab[1])
+        vibespace.aba_metric_mean(ab[0], ab[1])
+        vibespace.aba_metric_identity(ab[0], ab[1])
 
     ABC_list = [
         ('book', 'song', 'movie'),
@@ -78,6 +80,7 @@ if __name__ == "__main__":
     for abc in ABC_list:
         print(abc)
         vibespace.abca_metric(abc[0], abc[1], abc[2])
+        vibespace.aba_metric_mean(abc[0], abc[1], abc[2])
         vibespace.abca_metric_identity(abc[0], abc[1], abc[2])
 
     print("DONE")

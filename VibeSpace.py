@@ -38,6 +38,7 @@ class VibeSpace(object):
                  embedding_size: int=1000,
                  train_epochs: int=100,
                  learning_rate: float=0.001,
+                 num_permutations: int=0,
                  save_vecspaces: bool = False):
         """
 
@@ -72,7 +73,7 @@ class VibeSpace(object):
         # We must make vector embedding spaces for each domain
         if len(saved_vecspace_models) == 0:
             self.vibespaces = {
-                d: self.make_vector_space(d) for d in domain_names
+                d: self.make_vector_space(d, num_permutations=num_permutations) for d in domain_names
             }
             for k, v in self.vibespaces.items():
                 v.save(f"models/{k}.model")
@@ -140,7 +141,7 @@ class VibeSpace(object):
         #plt.scatter(plotmaps[domains[0]][:,0], plotmaps[domains[0]][:,1], c="green")
         plt.scatter(plotmaps[domains[1]][:,0], plotmaps[domains[1]][:,1], c="blue")
         if num_domains == 3:
-            plotmaps[domains[2]] = self.reduced_vibespaces[domains[2]] + np.array([1.5*np.max(self.reduced_vibespaces[domains[0]]), 3*np.max(self.reduced_vibespaces[domains[0]])])
+            plotmaps[domains[2]] = self.reduced_vibespaces[domains[2]] + np.array([1.0*np.max(self.reduced_vibespaces[domains[0]]), 3*np.max(self.reduced_vibespaces[domains[0]])])
             plt.scatter(plotmaps[domains[2]][:,0], plotmaps[domains[2]][:,1], c="red")
         sim_rank = np.flip(np.argsort(
             [self.similarity_module.get_similarity(self.vibespaces[domain_chain[0]].wv.vectors[index_chain[0]], v) for v
@@ -180,13 +181,12 @@ class VibeSpace(object):
         similarities = []
         percentiles = []
         #for e_a in tqdm(self.vibespaces[domain_a].wv.index_to_key[:1000]):
-        for e_a_i in range(1000):
+        for e_a_i in tqdm(range(100)):
             e_a = self.vibespaces[domain_a].wv.index_to_key[e_a_i]
             vec_a = self.get_vector(domain_a, e_a)
             vec_b = self.map_entity(domain_a, domain_b, e_a)
             e_b, _ = self.get_most_similar_entity_from_vector(domain_b, vec_b)
             vec_a_dash = self.map_entity(domain_b, domain_a, e_b)
-            print(vec_a_dash)
             e_a_dash, _ = self.get_most_similar_entity_from_vector(domain_a, vec_a_dash)
             vec_a_dash = self.get_vector(domain_a, e_a_dash)
             sim = self.similarity_module.get_similarity(vec_a, vec_a_dash)
@@ -194,8 +194,7 @@ class VibeSpace(object):
             per = self.get_similarity_percentile(domain_a, vec_a, vec_a_dash)
             percentiles.append(per)
             title = f"Entity {e_a} -> {e_b} -> {e_a_dash} is closer than {per:.2f}% of other {domain_a}'s: similarity={sim:.2f}"
-            print(title)
-            self.visualize_mapping((domain_a, domain_b, domain_a), (e_a, e_b, e_a_dash), title=title)
+            #self.visualize_mapping((domain_a, domain_b, domain_a), (e_a, e_b, e_a_dash), title=title)
         print(f"METRIC RESULTS FOR {domain_a}->{domain_b}->{domain_a}")
         print(f"Average similarity between A and A' where A->B->A' is {np.mean(percentiles)}")
 
@@ -208,7 +207,7 @@ class VibeSpace(object):
         assert domain_c in self.domain_names, "domain_c is not a known domain"
         similarities = []
         percentiles = []
-        for e_a_i in range(1000):
+        for e_a_i in tqdm(range(100)):
             e_a = self.vibespaces[domain_a].wv.index_to_key[e_a_i]
             vec_a = self.get_vector(domain_a, e_a)
             vec_b = self.map_entity(domain_a, domain_b, e_a)
@@ -223,8 +222,7 @@ class VibeSpace(object):
             per = self.get_similarity_percentile(domain_a, vec_a, vec_a_dash)
             percentiles.append(per)
             title = f"Entity {e_a} -> {e_b} -> {e_c} -> {e_a_dash} is closer than {per*100: .2f}% of other {domain_a}'s"
-            print(title)
-            self.visualize_mapping((domain_a, domain_b, domain_c, domain_a), (e_a, e_b, e_c, e_a_dash), title=title)
+            #self.visualize_mapping((domain_a, domain_b, domain_c, domain_a), (e_a, e_b, e_c, e_a_dash), title=title)
         print(f"METRIC RESULTS FOR {domain_a}->{domain_b}->{domain_c}->{domain_a}")
         print(f"Average similarity between A and A' where A->B->C->A' is {np.mean(percentiles)}")
 
@@ -235,7 +233,7 @@ class VibeSpace(object):
         assert domain_b in self.domain_names, "domain_b is not a known domain"
         similarities = []
         percentiles = []
-        for e_a_i in range(1000):
+        for e_a_i in tqdm(range(100)):
             e_a = self.vibespaces[domain_a].wv.index_to_key[e_a_i]
             vec_a = self.get_vector(domain_a, e_a)
             vec_b = vec_a
@@ -246,7 +244,7 @@ class VibeSpace(object):
             similarities.append(self.similarity_module.get_similarity(vec_a, vec_a_dash))
             per = self.get_similarity_percentile(domain_a, vec_a, vec_a_dash)
             percentiles.append(per)
-            print(f"Entity {e_a} -> {e_b} -> {e_a_dash} is closer than {per}% of other {domain_a}'s")
+            #print(f"Entity {e_a} -> {e_b} -> {e_a_dash} is closer than {per}% of other {domain_a}'s")
         print(f"IDENTITY METRIC RESULTS FOR {domain_a}->{domain_b}->{domain_a}")
         print(f"IDENTITY: Average similarity between A and A' where A->B->A' is {np.mean(percentiles)}")
 
@@ -259,7 +257,7 @@ class VibeSpace(object):
         assert domain_c in self.domain_names, "domain_c is not a known domain"
         similarities = []
         percentiles = []
-        for e_a_i in range(1000):
+        for e_a_i in tqdm(range(100)):
             e_a = self.vibespaces[domain_a].wv.index_to_key[e_a_i]
             vec_a = self.get_vector(domain_a, e_a)
             vec_b = vec_a
@@ -272,7 +270,55 @@ class VibeSpace(object):
             similarities.append(self.similarity_module.get_similarity(vec_a, vec_a_dash))
             per = self.get_similarity_percentile(domain_a, vec_a, vec_a_dash)
             percentiles.append(per)
-            print(f"Entity {e_a} -> {e_b} -> {e_c} -> {e_a_dash} is closer than {per}% of other {domain_a}'s")
+            #print(f"Entity {e_a} -> {e_b} -> {e_c} -> {e_a_dash} is closer than {per}% of other {domain_a}'s")
+        print(f"IDENTITY METRIC RESULTS FOR {domain_a}->{domain_b}->{domain_c}->{domain_a}")
+        print(f"IDENTITY: Average similarity between A and A' where A->B->C->A' is {np.mean(percentiles)}")
+
+    def aba_metric_mean(self,
+                        domain_a:str,
+                        domain_b:str):
+        assert domain_a in self.domain_names, "domain_a is not a known domain"
+        assert domain_b in self.domain_names, "domain_b is not a known domain"
+        similarities = []
+        percentiles = []
+        for e_a_i in tqdm(range(100)):
+            e_a = self.vibespaces[domain_a].wv.index_to_key[e_a_i]
+            vec_a = self.get_vector(domain_a, e_a)
+            vec_b = np.mean(self.vibespaces[domain_b].wv.vectors, axis=0)
+            e_b, _ = self.get_most_similar_entity_from_vector(domain_b, vec_b)
+            vec_a_dash = np.mean(self.vibespaces[domain_a].wv.vectors, axis=0)
+            e_a_dash, _ = self.get_most_similar_entity_from_vector(domain_a, vec_a_dash)
+            vec_a_dash = self.get_vector(domain_a, e_a_dash)
+            similarities.append(self.similarity_module.get_similarity(vec_a, vec_a_dash))
+            per = self.get_similarity_percentile(domain_a, vec_a, vec_a_dash)
+            percentiles.append(per)
+            #print(f"Entity {e_a} -> {e_b} -> {e_a_dash} is closer than {per}% of other {domain_a}'s")
+        print(f"MEAN METRIC RESULTS FOR {domain_a}->{domain_b}->{domain_a}")
+        print(f"MEAN: Average similarity between A and A' where A->B->A' is {np.mean(percentiles)}")
+
+    def abca_metric_mean(self,
+                         domain_a:str,
+                         domain_b:str,
+                         domain_c:str):
+        assert domain_a in self.domain_names, "domain_a is not a known domain"
+        assert domain_b in self.domain_names, "domain_b is not a known domain"
+        assert domain_c in self.domain_names, "domain_c is not a known domain"
+        similarities = []
+        percentiles = []
+        for e_a_i in tqdm(range(100)):
+            e_a = self.vibespaces[domain_a].wv.index_to_key[e_a_i]
+            vec_a = self.get_vector(domain_a, e_a)
+            vec_b = np.mean(self.vibespaces[domain_b].wv.vectors, axis=0)
+            e_b, _ = self.get_most_similar_entity_from_vector(domain_b, vec_b)
+            vec_c = np.mean(self.vibespaces[domain_c].wv.vectors, axis=0)
+            e_c, _ = self.get_most_similar_entity_from_vector(domain_c, vec_c)
+            vec_a_dash = np.mean(self.vibespaces[domain_a].wv.vectors, axis=0)
+            e_a_dash, _ = self.get_most_similar_entity_from_vector(domain_a, vec_a_dash)
+            vec_a_dash = self.get_vector(domain_a, e_a_dash)
+            similarities.append(self.similarity_module.get_similarity(vec_a, vec_a_dash))
+            per = self.get_similarity_percentile(domain_a, vec_a, vec_a_dash)
+            percentiles.append(per)
+            #print(f"Entity {e_a} -> {e_b} -> {e_c} -> {e_a_dash} is closer than {per}% of other {domain_a}'s")
         print(f"IDENTITY METRIC RESULTS FOR {domain_a}->{domain_b}->{domain_c}->{domain_a}")
         print(f"IDENTITY: Average similarity between A and A' where A->B->C->A' is {np.mean(percentiles)}")
 
