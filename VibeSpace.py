@@ -587,10 +587,10 @@ if __name__ == "__main__":
                           common_name_functions=common_name_functions,
                           similarity_metric="euclidean",
                           #similarity_metric="cosine",
-                          embedding_size=2,
+                          embedding_size=1024,
                           train_epochs=100,
                           saved_vecspace_models=[],
-                          #saved_vecspace_models=saved_vecspace_models,
+                        #   saved_vecspace_models=saved_vecspace_models,
                           #load_mapper_weights=True,
                           load_mapper_weights=False,
                           mapping_files=mapping_files)
