@@ -45,13 +45,14 @@ if __name__ == "__main__":
                           common_name_functions=common_name_functions,
                           mapping_files=mapping_files,
                           similarity_metric="euclidean",
-                         # embedding_size=1024,
-                          embedding_size=512,
+                          embedding_size=2048,
+                          #embedding_size=512,
                           train_epochs=100,
                           saved_vecspace_models=saved_vecspace_models,
                           #saved_vecspace_models=[],
                           num_permutations=10,
-                          load_mapper_weights=True)
+                          learning_rate=0.0003,
+                          load_mapper_weights=False)
 
 
     AB_list = [
