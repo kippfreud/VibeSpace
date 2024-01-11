@@ -326,6 +326,7 @@ class VibeSpace(object):
 
     def make_mapping(self,
                    map_pair):
+        print(map_pair)
         mapping = self.mapping_files[map_pair]
         frm = map_pair[0]
         to = map_pair[1]
@@ -444,7 +445,7 @@ class VibeSpace(object):
                    domain_to,
                    vector):
         if isinstance(vector, np.ndarray):
-            vector = torch.tensor(vector)
+            vector = torch.tensor(vector).cuda()
         mapped_vector = self.mappings[(domain_from, domain_to)](vector)
         return mapped_vector
 
@@ -588,9 +589,10 @@ if __name__ == "__main__":
                           similarity_metric="euclidean",
                           #similarity_metric="cosine",
                           embedding_size=1024,
-                          train_epochs=100,
-                          saved_vecspace_models=[],
-                        #   saved_vecspace_models=saved_vecspace_models,
+                          train_epochs=1000,
+                        #   saved_vecspace_models=[],
+                          saved_vecspace_models=saved_vecspace_models,
+                          learning_rate=0.0001,
                           #load_mapper_weights=True,
                           load_mapper_weights=False,
                           mapping_files=mapping_files)
