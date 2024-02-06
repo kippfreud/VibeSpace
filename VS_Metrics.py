@@ -52,7 +52,7 @@ if __name__ == "__main__":
                           #saved_vecspace_models=[],
                           num_permutations=10,
                           learning_rate=0.0003,
-                          load_mapper_weights=False)
+                          load_mapper_weights=True)
 
 
     AB_list = [
@@ -80,7 +80,7 @@ if __name__ == "__main__":
 
     for abc in ABC_list:
         print(abc)
-        vibespace.abca_metric(abc[0], abc[1], abc[2])
+        #vibespace.abca_metric(abc[0], abc[1], abc[2])
         vibespace.aba_metric_mean(abc[0], abc[1], abc[2])
         vibespace.abca_metric_identity(abc[0], abc[1], abc[2])
 

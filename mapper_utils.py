@@ -22,8 +22,8 @@ class MapDataset(Dataset):
     def __getitem__(self, idx):
         input = self.data[idx]["input"]
         outputs = self.data[idx]["targets"]
-        output = random.choice(outputs)
-        #output = outputs[0]
+        #output = random.choice(outputs)
+        output = outputs[0]
         out = output + np.random.normal(0,0.1,output.shape[0])
         return torch.tensor(input, device='cuda'), torch.tensor(out, dtype=torch.float32, device='cuda')
 
@@ -82,7 +82,7 @@ def train_AE_mapper(dataset,
     if loss_func == "cosine":
         cos_emb_loss = nn.CosineEmbeddingLoss()
         def cos_loss(a, b):
-            return cos_emb_loss(a, b, torch.ones(a.size(0)))
+            return cos_emb_loss(a, b, torch.ones(a.size(0)).cuda())
         loss_function = cos_loss
     elif loss_func == "euclidean":
         loss_function = nn.MSELoss()

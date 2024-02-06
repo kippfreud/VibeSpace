@@ -194,7 +194,7 @@ class VibeSpace(object):
             per = self.get_similarity_percentile(domain_a, vec_a, vec_a_dash)
             percentiles.append(per)
             title = f"Entity {e_a} -> {e_b} -> {e_a_dash} is closer than {per:.2f}% of other {domain_a}'s: similarity={sim:.2f}"
-            #self.visualize_mapping((domain_a, domain_b, domain_a), (e_a, e_b, e_a_dash), title=title)
+            self.visualize_mapping((domain_a, domain_b, domain_a), (e_a, e_b, e_a_dash), title=title)
         print(f"METRIC RESULTS FOR {domain_a}->{domain_b}->{domain_a}")
         print(f"Average similarity between A and A' where A->B->A' is {np.mean(percentiles)}")
 
@@ -445,6 +445,7 @@ class VibeSpace(object):
                    vector):
         if isinstance(vector, np.ndarray):
             vector = torch.tensor(vector)
+        vector = vector.cuda()
         mapped_vector = self.mappings[(domain_from, domain_to)](vector)
         return mapped_vector
 
@@ -515,8 +516,6 @@ class VibeSpace(object):
                 if sterm in self.vibespaces[dchain[0]].wv.index_to_key:
                     end_vec, vec_chain = self.map_entity_chain(entity=sterm,
                                                                domain_chain=dchain)
-
-
                     similarities = self.similarity_module.get_similarities(end_vec.detach().cpu().numpy(), self.vibespaces[dchain[-1]].wv.vectors)
 
                     isort = sorted(range(len(similarities)), key=lambda i: similarities[i], reverse=True)
@@ -585,9 +584,9 @@ if __name__ == "__main__":
                           similarity_files=sim_files,
                           meta_files=meta_files,
                           common_name_functions=common_name_functions,
-                          similarity_metric="euclidean",
-                          #similarity_metric="cosine",
-                          embedding_size=1024,
+                          #similarity_metric="euclidean",
+                          similarity_metric="cosine",
+                          embedding_size=512,
                           train_epochs=100,
                           saved_vecspace_models=[],
                         #   saved_vecspace_models=saved_vecspace_models,
