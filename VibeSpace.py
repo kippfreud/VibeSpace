@@ -11,6 +11,7 @@ from sklearn.manifold import TSNE
 import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 from utils import Corpus, CosineSimilarity, EuclideanSimilarity
 from mapper_utils import train_AE_mapper
@@ -136,27 +137,64 @@ class VibeSpace(object):
             exit(1)
         plotmaps = {
             domains[0]: self.reduced_vibespaces[domains[0]],
-            domains[1]: self.reduced_vibespaces[domains[1]] + np.array([3*np.max(self.reduced_vibespaces[domains[0]]),0])#mp.max(self.reduced_vibespaces[domains[0]])[0]
+            domains[1]: self.reduced_vibespaces[domains[1]] + np.array([2*np.max(self.reduced_vibespaces[domains[0]]),0])#mp.max(self.reduced_vibespaces[domains[0]])[0]
         }
+        for dnI, dname in enumerate(plotmaps.keys()):
+            avp = np.mean(plotmaps[dname], axis=0)
+            if dnI < 2:
+                y = 15
+            else:
+                y = avp[1]+15
+            plt.text(avp[0]-3, y, dname, fontweight="bold", rotation=0, fontsize=20)
         #plt.scatter(plotmaps[domains[0]][:,0], plotmaps[domains[0]][:,1], c="green")
-        plt.scatter(plotmaps[domains[1]][:,0], plotmaps[domains[1]][:,1], c="blue")
+        plt.scatter(plotmaps[domains[1]][:,0], plotmaps[domains[1]][:,1], c="tab:blue", alpha=0.03, s=2)
+        plt.axis("off")
         if num_domains == 3:
-            plotmaps[domains[2]] = self.reduced_vibespaces[domains[2]] + np.array([1.0*np.max(self.reduced_vibespaces[domains[0]]), 3*np.max(self.reduced_vibespaces[domains[0]])])
-            plt.scatter(plotmaps[domains[2]][:,0], plotmaps[domains[2]][:,1], c="red")
+            plotmaps[domains[2]] = self.reduced_vibespaces[domains[2]] + np.array([1.0*np.max(self.reduced_vibespaces[domains[0]]), 2*np.max(self.reduced_vibespaces[domains[0]])])
+            plt.scatter(plotmaps[domains[2]][:,0], plotmaps[domains[2]][:,1], c="tab:red", alpha=0.03, s=2)
         sim_rank = np.flip(np.argsort(
             [self.similarity_module.get_similarity(self.vibespaces[domain_chain[0]].wv.vectors[index_chain[0]], v) for v
              in self.vibespaces[domain_chain[0]].wv.vectors]))
         cmap = np.linspace(1, 0, len(sim_rank))#[sim_rank]
-        plt.scatter(plotmaps[domain_chain[0]][sim_rank[:]][:, 0], plotmaps[domain_chain[0]][sim_rank[:]][:, 1], c=cmap[:])
+        #plt.scatter(plotmaps[domain_chain[0]][sim_rank[:]][:, 0], plotmaps[domain_chain[0]][sim_rank[:]][:, 1], c=cmap[:])
+        plt.scatter(plotmaps[domain_chain[0]][sim_rank[:]][:, 0], plotmaps[domain_chain[0]][sim_rank[:]][:, 1], c="tab:green", alpha=0.03, s=2)
+        arrowpatches = []
         for i in range(1,len(domain_chain)):
             start_xy = plotmaps[domain_chain[i-1]][index_chain[i-1]]
-            plt.text(start_xy[0], start_xy[1], entity_chain[i-1])
+            if i > 0:
+                plt.text(start_xy[0]-5, start_xy[1]-2, entity_chain[i-1].split("-")[0], fontsize="large", fontweight="bold")
+                pass
+            else:
+                plt.text(start_xy[0]-5, start_xy[1]+2, entity_chain[i-1].split("-")[0], fontsize="large", fontweight="bold")
+                pass
             end_xy = plotmaps[domain_chain[i]][index_chain[i]]
             dxdy = end_xy - start_xy
-            plt.arrow(start_xy[0], start_xy[1], dxdy[0], dxdy[1])
-        plt.text(end_xy[0], end_xy[1], entity_chain[-1])
+            #connectionstyle = patches.ConnectionStyle("Arc3", rad=0.2)
+            connectionstyle ="arc3,rad=-0.3"
+            cheat=0.
+            if i==1:
+                #connectionstyle = patches.ConnectionStyle("Arc3", rad=-0.2)
+                connectionstyle ="arc3,rad=0.3"
+                cheat=0.25
+            if i==2:
+                #connectionstyle = patches.ConnectionStyle("Arc3", rad=0.2)
+                connectionstyle ="arc3,rad=0.3"
+            # plt.arrow(start_xy[0], start_xy[1], dxdy[0], dxdy[1], width=0.2,
+            #           color="black", linestyle="-", head_starts_at_zero=True)
+            arrowpatches.append(patches.FancyArrowPatch((start_xy[0], start_xy[1]-cheat),
+                                         (start_xy[0]+dxdy[0], start_xy[1]+dxdy[1]),
+                                         connectionstyle=connectionstyle,
+                                         mutation_scale=10., color="black")
+                                )
+            plt.scatter([start_xy[0]], [start_xy[1]], c="pink", s=5)
+
+        plt.text(end_xy[0]-5, end_xy[1]+2, entity_chain[-1].split("-")[0], fontsize="large", fontweight="bold")
+        plt.scatter([end_xy[0]], [end_xy[1]], c="red", s=5)
         if title is not None:
             plt.title(title)
+        for patch in arrowpatches:
+            plt.gca().add_patch(patch)
+            #pass
         plt.show()
 
     # -----------------------------------------------------------------------------
@@ -326,6 +364,7 @@ class VibeSpace(object):
 
     def make_mapping(self,
                    map_pair):
+        print(map_pair)
         mapping = self.mapping_files[map_pair]
         frm = map_pair[0]
         to = map_pair[1]
@@ -444,8 +483,7 @@ class VibeSpace(object):
                    domain_to,
                    vector):
         if isinstance(vector, np.ndarray):
-            vector = torch.tensor(vector)
-        vector = vector.cuda()
+            vector = torch.tensor(vector).cuda()
         mapped_vector = self.mappings[(domain_from, domain_to)](vector)
         return mapped_vector
 
@@ -453,12 +491,14 @@ class VibeSpace(object):
                          entity: str,
                          domain_chain: list):
         assert len(domain_chain) > 1
-        vector_chain = []
+        vector_chain = [torch.tensor(self.get_vector(domain_chain[0], entity))]
         mapped_vector = self.map_entity(domain_chain[0], domain_chain[1], entity)
-        vector_chain.append(mapped_vector)
+        mapped_vector = self.get_vector(domain_chain[1], self.get_most_similar_entity_from_vector(domain_chain[1], mapped_vector)[0])
+        vector_chain.append(torch.tensor(mapped_vector))
         if len(domain_chain) > 2:
             for i in range(2, len(domain_chain)):
                 mapped_vector = self.map_vector(domain_chain[i-1], domain_chain[i], mapped_vector)
+                mapped_vector = self.get_vector(domain_chain[i], self.get_most_similar_entity_from_vector(domain_chain[i], mapped_vector)[0])
                 vector_chain.append(mapped_vector)
         return mapped_vector, vector_chain
 
@@ -516,6 +556,7 @@ class VibeSpace(object):
                 if sterm in self.vibespaces[dchain[0]].wv.index_to_key:
                     end_vec, vec_chain = self.map_entity_chain(entity=sterm,
                                                                domain_chain=dchain)
+                    end_vec = torch.tensor(end_vec).cuda() #..todo: please remove
                     similarities = self.similarity_module.get_similarities(end_vec.detach().cpu().numpy(), self.vibespaces[dchain[-1]].wv.vectors)
 
                     isort = sorted(range(len(similarities)), key=lambda i: similarities[i], reverse=True)
@@ -530,6 +571,8 @@ class VibeSpace(object):
                     for i in range(5):
                         print(f"{similar_entities[-i - 1]}: {similarity_scores[-i - 1]}")
                     print("\n")
+                    ent_chain = [self.get_most_similar_entity_from_vector(dchain[i], vec_chain[i])[0] for i in range(len(vec_chain))]
+                    self.visualize_mapping(dchain, ent_chain)
                     search_complete = True
                 else:
                     shared = {s: len(set(sterm.split(" ")) & set(search_dicts[dchain[0]][s])) for s in search_dicts[dchain[0]].keys()};
@@ -585,13 +628,12 @@ if __name__ == "__main__":
                           meta_files=meta_files,
                           common_name_functions=common_name_functions,
                           #similarity_metric="euclidean",
-                          similarity_metric="cosine",
+                          similarity_metric="euclidean",
                           embedding_size=512,
                           train_epochs=100,
-                          saved_vecspace_models=[],
-                        #   saved_vecspace_models=saved_vecspace_models,
-                          #load_mapper_weights=True,
-                          load_mapper_weights=False,
+                          #saved_vecspace_models=[],
+                          saved_vecspace_models=saved_vecspace_models,
+                          load_mapper_weights=True,
                           mapping_files=mapping_files)
 
     vibespace.run()

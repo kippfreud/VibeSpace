@@ -35,11 +35,9 @@ class Autoencoder(nn.Module):
         # Encoder
         self.encoder_1 = nn.Linear(n, int(n/4))
         self.encoder_2 = nn.Linear(int(n/4), int(n/16))
-        # self.encoder_1 = nn.Linear(n, int(n/16))
         # Decoder
         self.decoder_1 = nn.Linear(int(n/16), int(n/4))
         self.decoder_2 = nn.Linear(int(n/4), n)
-        #self.decoder_2 = nn.Linear(int(n/16), n)
 
     def forward(self, x):
         x = self.encoder_1(x)
@@ -49,13 +47,13 @@ class Autoencoder(nn.Module):
         x = self.decoder_1(x)
         x = F.relu(x)
         x = self.decoder_2(x)
-        x = 4.*torch.tanh(x)
+        #x = 4.*torch.tanh(x)
         return x
 
 def train_AE_mapper(dataset,
                     train_raio: float = 0.8,
                     num_epochs: int = 50,
-                    batch_size: int = 64,
+                    batch_size: int = 256,
                     learning_rate: float = 0.001,
                     loss_func: str = "cosine",
                     model_path=None,
@@ -91,10 +89,10 @@ def train_AE_mapper(dataset,
         exit(1)
 
     best_val = None
-    patience = 10  # Set your patience for early stopping
+    patience = 100  # Set your patience for early stopping
     epochs_no_improve = 0  # Counter for epochs with no improvement
     best_model_state = None  # To save the best model state
-
+    sd = 0.003
     # Training loop
     for epoch in range(num_epochs):
         model.train()
@@ -102,6 +100,19 @@ def train_AE_mapper(dataset,
         for data, labels in train_loader:
             data = data.to('cuda')
             labels = labels.to('cuda')
+            d_orig = data.clone()
+            l_orig = labels.clone()
+            for i in range(50):
+                d = d_orig.clone()
+                l = l_orig.clone()
+
+                d = d + torch.empty(d.size(),device="cuda").normal_(mean=0,std=sd)
+                l = l + torch.empty(l.size(),device="cuda").normal_(mean=0,std=sd)
+
+                data = torch.cat((data, d),0)
+                labels = torch.cat((labels, l),0)
+
+            # print(data.shape)
 
             optimizer.zero_grad()
             reconstructions = model(data)
@@ -128,7 +139,9 @@ def train_AE_mapper(dataset,
             best_val = total_val_loss
             epochs_no_improve = 0
             best_model_state = model.state_dict()  # Save the best model state
-            print(f"New best validation: {best_val} at epoch {epoch}")
+            # print(f"New best validation: {best_val} at epoch {epoch}")
+            print(f'Epoch [{epoch + 1}/{num_epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
+
         else:
             epochs_no_improve += 1
             if epochs_no_improve == patience:
@@ -137,7 +150,6 @@ def train_AE_mapper(dataset,
                 break
 
         # Print losses
-        print(f'Epoch [{epoch + 1}/{num_epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
     if model_path is not None:
         torch.save(model.state_dict(), model_path)
     return model
