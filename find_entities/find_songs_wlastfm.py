@@ -1,8 +1,9 @@
-
-from tqdm import tqdm
 import json
-import requests
 import re
+
+import requests
+from tqdm import tqdm
+
 
 def handler(signum, frame):
     raise TimeoutError("Operation timed out!")
@@ -36,15 +37,19 @@ song_meta = {}
 API_KEY = "fa0dd8874d2ac5231b78eddf76165bae"  # this is a sample key
 API_SECRET = "8dbbf8e4941b4e4d38382e29b4cf1673"
 
-#song_meta = {}
+# song_meta = {}
 try:
     for e in tqdm(entity_list):
-        SEARCH_STR = re.sub("\(.*?\)","",e)
-        SEARCH_STR = SEARCH_STR.strip().replace("|", " ").replace("(", " ").replace(")","")
+        SEARCH_STR = re.sub("\(.*?\)", "", e)
+        SEARCH_STR = (
+            SEARCH_STR.strip().replace("|", " ").replace("(", " ").replace(")", "")
+        )
         SEARCH_STR = SEARCH_STR.replace("&", "and")
-        x = requests.get(f'http://ws.audioscrobbler.com/2.0/?method=track.search&track={SEARCH_STR}&api_key={API_KEY}&format=json')
+        x = requests.get(
+            f"http://ws.audioscrobbler.com/2.0/?method=track.search&track={SEARCH_STR}&api_key={API_KEY}&format=json"
+        )
         if x.status_code == 200:
-            met = json.loads(x.content.decode('utf8'))
+            met = json.loads(x.content.decode("utf8"))
             if len(met["results"]["trackmatches"]["track"]) == 0:
                 print(f"{e} had no search results...")
                 song_meta[e] = "No Results..."
@@ -53,20 +58,22 @@ try:
             tname = track["name"]
             tartist = track["artist"]
             x = requests.get(
-                f'http://ws.audioscrobbler.com/2.0/?method=track.getTopTags&track={tname}&artist={tartist}&api_key={API_KEY}&format=json')
+                f"http://ws.audioscrobbler.com/2.0/?method=track.getTopTags&track={tname}&artist={tartist}&api_key={API_KEY}&format=json"
+            )
             # x = requests.get(
             #     f'http://ws.audioscrobbler.com/2.0/?method=track.getTags&api_key={API_KEY}&artist={tartist}&track={tname}&format=json'
             # )
             if x.status_code == 200:
                 try:
-                    tags = [T["name"] for T in json.loads(x.content.decode('utf8'))["toptags"]["tag"][:10]]
+                    tags = [
+                        T["name"]
+                        for T in json.loads(x.content.decode("utf8"))["toptags"]["tag"][
+                            :10
+                        ]
+                    ]
                 except:
                     tags = []
-                song_meta[e] = {
-                    "track": tname,
-                    "artist": tartist,
-                    "tags": tags
-                }
+                song_meta[e] = {"track": tname, "artist": tartist, "tags": tags}
             else:
                 song_meta[e] = "API error"
                 continue
@@ -75,14 +82,19 @@ try:
             )
             if x.status_code == 200:
                 try:
-                    simtracks = [{"track": T["name"], "artist": T["artist"]["name"]} for T in json.loads(x.content.decode('utf8'))["similartracks"]["track"][:10]]
+                    simtracks = [
+                        {"track": T["name"], "artist": T["artist"]["name"]}
+                        for T in json.loads(x.content.decode("utf8"))["similartracks"][
+                            "track"
+                        ][:10]
+                    ]
                 except:
                     simtracks = []
                 song_meta[e] = {
                     "track": tname,
                     "artist": tartist,
                     "tags": tags,
-                    "similar": simtracks
+                    "similar": simtracks,
                 }
             else:
                 song_meta[e] = "API error"
@@ -90,7 +102,9 @@ try:
         else:
             song_meta[e] = "API error"
 except:
-    print(f"Finished {len(list(song_meta.keys()))} songs out of {len(entity_list)} then broke...")
+    print(
+        f"Finished {len(list(song_meta.keys()))} songs out of {len(entity_list)} then broke..."
+    )
     with open(f"song_meta.json", "w") as outfile:
         json.dump(song_meta, outfile, indent=4)
 

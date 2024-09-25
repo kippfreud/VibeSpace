@@ -1,16 +1,20 @@
 from typing import List
+
 import numpy as np
 from numpy import dot
 from numpy.linalg import norm
 
+
 def _cos_sim(a, b):
     return dot(a, b) / (norm(a) * norm(b))
+
 
 def _euclidean_dist(a, b):
     dist = norm(a - b)
     return -dist
 
-class Similarity_Module():
+
+class Similarity_Module:
     def __init__(self, similarity_function):
         self.similarity_function = similarity_function
 
@@ -34,7 +38,7 @@ class Similarity_Module():
         distance_sum = 0
         num_pairs = 0
         for i in range(len(vectors)):
-            for j in range(i+1, len(vectors)):
+            for j in range(i + 1, len(vectors)):
                 distance_sum += self.similarity_function(vectors[i], vectors[j])
                 num_pairs += 1
 
@@ -42,8 +46,10 @@ class Similarity_Module():
         average_distance = distance_sum / num_pairs
         return average_distance
 
+
 CosineSimilarity = Similarity_Module(_cos_sim)
 EuclideanSimilarity = Similarity_Module(_euclidean_dist)
+
 
 class Corpus:
     """An iterator that yields sentences (lists of str)."""

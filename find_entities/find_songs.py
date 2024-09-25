@@ -1,15 +1,18 @@
-import spotipy
-from _old import spot_cred
-from spotipy.oauth2 import SpotifyOAuth
-from tqdm import tqdm
 import json
 import signal
-import requests
-from spotipy import SpotifyException
 import time
+
+import requests
+import spotipy
+from _old import spot_cred
+from spotipy import SpotifyException
+from spotipy.oauth2 import SpotifyOAuth
+from tqdm import tqdm
+
 
 def handler(signum, frame):
     raise TimeoutError("Operation timed out!")
+
 
 #
 # birdy_uri = 'spotify:artist:2WX2uTcsvV5OnS0inACecP'
@@ -24,7 +27,7 @@ def handler(signum, frame):
 #     print(album['name'])
 
 # Opening JSON file
-f = open('song_meta.json')
+f = open("song_meta.json")
 meta_dict = json.load(f)
 f.close()
 
@@ -47,11 +50,15 @@ entity_list = sorted(list(set(entity_list)))
 print(f"{len(sentence_list)} Sentences")
 print(f"{len(entity_list)} Songs")
 
-sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=spot_cred.client_ID,
-                                               client_secret=spot_cred.client_SECRET,
-                                               redirect_uri=spot_cred.redirect_url),
-                     retries=0,
-                     status_retries=0)
+sp = spotipy.Spotify(
+    auth_manager=SpotifyOAuth(
+        client_id=spot_cred.client_ID,
+        client_secret=spot_cred.client_SECRET,
+        redirect_uri=spot_cred.redirect_url,
+    ),
+    retries=0,
+    status_retries=0,
+)
 # sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id='7eda05abfe8b45c587cf619c63edd074',
 #                                                client_secret='075130841b2840a79c665d32d6b77476',
 #                                                redirect_uri='http://localhost/'))
@@ -59,10 +66,11 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(client_id=spot_cred.client_ID,
 #                                                client_secret='364de393f9b54485a26b8911e7ce0a2d',
 #                                                redirect_uri='http://localhost/'))
 
+
 def get_meta(e):
     r = sp.search(e)
     track = r["tracks"]["items"][0]
-    name = track['name']
+    name = track["name"]
     genres = sp.album(track["album"]["uri"])["genres"]
     if genres == []:
         for art in track["artists"]:
@@ -71,13 +79,14 @@ def get_meta(e):
                 break
     genres_str = ", ".join(genres)
     artists = ", ".join([t["name"] for t in track["artists"]])
-    album = track["album"]['name']
+    album = track["album"]["name"]
     ret = {
         "track_name": name,
         "genres": genres,
-        "artists": [t["name"] for t in track["artists"]]
+        "artists": [t["name"] for t in track["artists"]],
     }
     return ret
+
 
 real = 0
 fake = 0
@@ -85,11 +94,13 @@ throttled = False
 
 
 for i, e in enumerate(tqdm(entity_list)):
-    #time.sleep(1)
+    # time.sleep(1)
     if throttled:
         break
-    if i>0 and i%1000==0:
-        print(f"Got meta info for {len(list(meta_dict.keys()))} out of {len(entity_list)} songs")
+    if i > 0 and i % 1000 == 0:
+        print(
+            f"Got meta info for {len(list(meta_dict.keys()))} out of {len(entity_list)} songs"
+        )
         with open("song_meta.json", "w") as outfile:
             json.dump(meta_dict, outfile)
     meta_dict[e] = get_meta(e)
@@ -135,6 +146,8 @@ for i, e in enumerate(tqdm(entity_list)):
         meta_dict[e] = False
 
 print("FINISHED!")
-print(f"Got meta info for {len(list(meta_dict.keys()))} out of {len(entity_list)} songs")
+print(
+    f"Got meta info for {len(list(meta_dict.keys()))} out of {len(entity_list)} songs"
+)
 with open("song_meta.json", "w") as outfile:
-    json.dump(meta_dict , outfile, indent=4)
+    json.dump(meta_dict, outfile, indent=4)

@@ -1,29 +1,34 @@
-import matplotlib.pyplot as plt
 import matplotlib
+import matplotlib.pyplot as plt
+
 matplotlib.use("TkAgg")
-from sklearn.manifold import TSNE                   # final reduction
-import numpy as np                                  # array handling
+import json
 import random
-import pandas as pd
-import requests
+
 import gensim.models
-from tqdm import tqdm
 import hdbscan
 import joblib
+import numpy as np  # array handling
+import pandas as pd
+import requests
 from gensim.models import KeyedVectors
 from sklearn.cluster import KMeans
-import json
+from sklearn.manifold import TSNE  # final reduction
+from tqdm import tqdm
 
-#domain = "book"
-#domain = "movie"
-#domain = "song"
+# domain = "book"
+# domain = "movie"
+# domain = "song"
 
-def reduce_dimensions(wv, ndims = 2):
+
+def reduce_dimensions(wv, ndims=2):
     # extract the words & their vectors, as numpy arrays
     vectors = np.asarray(wv.vectors)
     labels = np.asarray(wv.index_to_key)  # fixed-width numpy strings
     # reduce using t-SNE
-    tsne = TSNE(n_components=ndims, random_state=0, early_exaggeration=12, perplexity=30)
+    tsne = TSNE(
+        n_components=ndims, random_state=0, early_exaggeration=12, perplexity=30
+    )
     vectors = tsne.fit_transform(vectors)
     # pca = IncrementalPCA(n_components=num_dimensions, whiten=True)
     # vectors = pca.fit_transform(vectors)
@@ -32,24 +37,27 @@ def reduce_dimensions(wv, ndims = 2):
     # y_vals = [v[1] for v in vectors]
     return vectors, labels
 
+
 def plot_with_matplotlib(x_vals, y_vals, labels=[], colors=[]):
     if len(labels):
-        df = pd.DataFrame.from_dict({
-            "x": x_vals,
-            "y": y_vals,
-            "labels": labels,
+        df = pd.DataFrame.from_dict(
+            {
+                "x": x_vals,
+                "y": y_vals,
+                "labels": labels,
             }
         )
     else:
-        df = pd.DataFrame.from_dict({
-            "x": x_vals,
-            "y": y_vals,
+        df = pd.DataFrame.from_dict(
+            {
+                "x": x_vals,
+                "y": y_vals,
             }
         )
     if len(colors):
-        plt.scatter(df['x'], df['y'],s=1, c=colors, alpha=0.5, cmap='viridis')
+        plt.scatter(df["x"], df["y"], s=1, c=colors, alpha=0.5, cmap="viridis")
     else:
-        plt.scatter(df['x'], df['y'],s=1)
+        plt.scatter(df["x"], df["y"], s=1)
     if len(labels):
         indices = list(range(len(labels)))
         selected_indices = random.sample(indices, 300)
@@ -72,7 +80,11 @@ for i in tqdm(c_keys):
         v += 1
         # if "similar" in corpus[i].keys():
         #     if len(corpus[i]["similar"]):
-        if ("title" in corpus[i].keys()) and ("cast" in (corpus[i].keys())) and ("directors" in (corpus[i].keys())):
+        if (
+            ("title" in corpus[i].keys())
+            and ("cast" in (corpus[i].keys()))
+            and ("directors" in (corpus[i].keys()))
+        ):
             # if (corpus[i]["cast"] is not None):
             cast = ""
             if corpus[i]["cast"] is None:
@@ -102,26 +114,24 @@ for i in tqdm(c_keys):
             # unique_c.append(cast)
 
 
+# model = gensim.models.Word2Vec.load("movie.wordvectors")
+wv = KeyedVectors.load("movie.wordvectors", mmap="r")
 
-
-
-#model = gensim.models.Word2Vec.load("movie.wordvectors")
-wv = KeyedVectors.load("movie.wordvectors", mmap='r')
-
-#vectors, labels = reduce_dimensions(wv, 2)
+# vectors, labels = reduce_dimensions(wv, 2)
 
 kmeans = KMeans(n_clusters=10)
 kmeans.fit(wv.vectors)
 
 
-
 vectors, labels = reduce_dimensions(wv, 2)
-plot_with_matplotlib([v[0] for v in vectors], [v[1] for v in vectors], colors=kmeans.labels_)
+plot_with_matplotlib(
+    [v[0] for v in vectors], [v[1] for v in vectors], colors=kmeans.labels_
+)
 plt.show()
 
 
-#names = model.wv.index_to_key
-clusterer = hdbscan.HDBSCAN(min_cluster_size=20, alpha=1.)
+# names = model.wv.index_to_key
+clusterer = hdbscan.HDBSCAN(min_cluster_size=20, alpha=1.0)
 clusterer.fit(vectors)
 print(clusterer.labels_.max())
 clusterer.condensed_tree_.plot()
