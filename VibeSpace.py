@@ -48,6 +48,7 @@ class VibeSpace(object):
         train_epochs: int = 100,
         learning_rate: float = 0.001,
         num_permutations: int = 0,
+        min_num_occurunces: int = 1,
         save_vecspaces: bool = False,
         device="cpu",
     ):
@@ -106,28 +107,30 @@ class VibeSpace(object):
                     "WARNING: Saved vector models were given, but could not be loaded. Making new vecspaces."
                 )
                 self.vibespaces = {
-                    d: self.make_vector_space(d, num_permutations=num_permutations)
+                    d: self.make_vector_space(d,
+                                              num_permutations=num_permutations,
+                                              min_num_occurunces=min_num_occurunces)
                     for d in domain_names
                 }
                 for k, v in self.vibespaces.items():
                     v.save(f"models/{k}.model")
 
         # UMAP dimensionality reduction
-        # self.reduced_vibespaces = {d: umap.UMAP(
-        #     n_neighbors=5,
-        #     min_dist=0.001
-        # ).fit_transform(self.vibespaces[d].wv.vectors) for d in domain_names}
+        self.reduced_vibespaces = {d: umap.UMAP(
+            n_neighbors=5,
+            min_dist=0.001
+        ).fit_transform(self.vibespaces[d].wv.vectors) for d in domain_names}
         # TSNE dimensionality reduction
-        self.reduced_vibespaces = {
-            d: TSNE(
-                n_components=2,
-                learning_rate="auto",
-                init="random",
-                perplexity=1.0,
-                random_state=42,
-            ).fit_transform(self.vibespaces[d].wv.vectors)
-            for d in domain_names
-        }
+        # self.reduced_vibespaces = {
+        #     d: TSNE(
+        #         n_components=2,
+        #         learning_rate="auto",
+        #         init="random",
+        #         perplexity=1.0,
+        #         random_state=42,
+        #     ).fit_transform(self.vibespaces[d].wv.vectors)
+        #     for d in domain_names
+        # }
         # No dim reduction
         # self.reduced_vibespaces = {d: self.vibespaces[d].wv.vectors for d in domain_names}
 
@@ -570,7 +573,7 @@ class VibeSpace(object):
         mapper.eval()
         return mapper
 
-    def make_vector_space(self, domain: str, num_permutations: int = 0, from_path=None):
+    def make_vector_space(self, domain: str, num_permutations: int = 0, min_num_occurunces=1, from_path=None):
         print(f"Making vector space for domain {domain}...")
         if num_permutations > 0:
             print(
@@ -581,6 +584,7 @@ class VibeSpace(object):
         self.common_to_ent[domain] = {}
         final_sentence_list = []
         failed = []
+        all_filtered_ents = []
         for sent in tqdm(sentence_list):
             ents = sent.split("//")
             filtered_ents = []
@@ -595,7 +599,14 @@ class VibeSpace(object):
                 else:
                     print(f"{e} not in meta dict. Skipping")
                     failed.append(e)
-            for I in range(2, min(len(ents), 11)):
+            all_filtered_ents.append(filtered_ents)
+        if min_num_occurunces > 1:
+            counts = dict(Counter(string for sublist in all_filtered_ents for string in sublist))
+            all_filtered_ents = [[e for e in f_e if counts[e]>min_num_occurunces] for f_e in all_filtered_ents]
+            all_filtered_ents = [f_e for f_e in all_filtered_ents if len(f_e)>=2]
+            print(f"Filtered entities from {len(counts.keys())} to {len([key for key, value in counts.items() if value > min_num_occurunces])}")
+        for filtered_ents in all_filtered_ents:
+            for I in range(2, min(len(filtered_ents), 11)):
                 these_ents = filtered_ents[:I]
                 final_sentence_list.append("//".join(these_ents))
                 if num_permutations > 0:
@@ -711,7 +722,7 @@ class VibeSpace(object):
             print(f"{similar_entities[-i - 1]}: {similarity_scores[-i - 1]}")
         print("\n")
 
-    def generate_1vsRest(self, domain, meta, n=10, min_tag_count=1):
+    def generate_1vsRest(self, domain, meta, n=12, min_tag_count=1):
         print(f"\nGenerating 1vsRest for {domain}...")
         tags = [self.meta_files[domain][self.common_to_ent[domain][n]][meta] for n in self.vibespaces[domain].wv.index_to_key]
         tags = [t if t is not None else [] for t in tags]
@@ -880,17 +891,18 @@ if __name__ == "__main__":
         meta_files=meta_files,
         common_name_functions=common_name_functions,
         similarity_metric="cosine",
-        embedding_size=1028,
-        train_epochs=100,
-        # saved_vecspace_models=[],
-        saved_vecspace_models=saved_vecspace_models,
-        load_mapper_weights=True,
+        min_num_occurunces=5,
+        embedding_size=512,
+        train_epochs=1,
+        saved_vecspace_models=[],
+        # saved_vecspace_models=saved_vecspace_models,
+        load_mapper_weights=False,
         mapping_files=mapping_files,
     )
 
-    vibespace.generate_1vsRest("book", "subjects", min_tag_count=900)
-    # # vibespace.generate_1vsRest("book", "ol_genre", min_tag_count=1000)
-    vibespace.generate_1vsRest("song", "tags", min_tag_count=1000)
-    vibespace.generate_1vsRest("movie", "genres", min_tag_count=1000)
+    vibespace.generate_1vsRest("book", "subjects", min_tag_count=100)
+    # vibespace.generate_1vsRest("book", "ol_genre", min_tag_count=1)
+    # vibespace.generate_1vsRest("song", "tags", min_tag_count=1)
+    # vibespace.generate_1vsRest("movie", "genres", min_tag_count=1)
 
     vibespace.run()
