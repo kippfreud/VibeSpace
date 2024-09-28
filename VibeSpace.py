@@ -96,10 +96,10 @@ class VibeSpace(object):
         else:
             try:
                 self.vibespaces = {
-                    domain_names[i]: gensim.models.Word2Vec.load(
-                        saved_vecspace_models[i]
+                    self.make_vector_space(
+                        d, num_permutations=num_permutations, from_path=saved_vecspace_models[i]
                     )
-                    for i in range(len(domain_names))
+                    for d, i in enumerate(domain_names)
                 }
             except:
                 print(
@@ -113,21 +113,21 @@ class VibeSpace(object):
                     v.save(f"models/{k}.model")
 
         # UMAP dimensionality reduction
-        self.reduced_vibespaces = {d: umap.UMAP(
-            n_neighbors=5,
-            min_dist=0.001
-        ).fit_transform(self.vibespaces[d].wv.vectors) for d in domain_names}
+        # self.reduced_vibespaces = {d: umap.UMAP(
+        #     n_neighbors=5,
+        #     min_dist=0.001
+        # ).fit_transform(self.vibespaces[d].wv.vectors) for d in domain_names}
         # TSNE dimensionality reduction
-        # self.reduced_vibespaces = {
-        #     d: TSNE(
-        #         n_components=2,
-        #         learning_rate="auto",
-        #         init="random",
-        #         perplexity=30.0,
-        #         random_state=42,
-        #     ).fit_transform(self.vibespaces[d].wv.vectors)
-        #     for d in domain_names
-        # }
+        self.reduced_vibespaces = {
+            d: TSNE(
+                n_components=2,
+                learning_rate="auto",
+                init="random",
+                perplexity=1.0,
+                random_state=42,
+            ).fit_transform(self.vibespaces[d].wv.vectors)
+            for d in domain_names
+        }
         # No dim reduction
         # self.reduced_vibespaces = {d: self.vibespaces[d].wv.vectors for d in domain_names}
 
@@ -570,7 +570,7 @@ class VibeSpace(object):
         mapper.eval()
         return mapper
 
-    def make_vector_space(self, domain: str, num_permutations: int = 0):
+    def make_vector_space(self, domain: str, num_permutations: int = 0, from_path=None):
         print(f"Making vector space for domain {domain}...")
         if num_permutations > 0:
             print(
@@ -604,10 +604,13 @@ class VibeSpace(object):
                         final_sentence_list.append("//".join(p))
         print(f"Final corpus is {len(final_sentence_list)} sentences long")
         print(f"There were {len(failed)} failures")
-        corpus = Corpus([f for f in final_sentence_list if f!=""])
-        model = gensim.models.Word2Vec(
-            sentences=corpus, min_count=10, vector_size=self.embedding_size, window=6
-        )
+        if from_path is None:
+            corpus = Corpus([f for f in final_sentence_list if f!=""])
+            model = gensim.models.Word2Vec(
+                sentences=corpus, min_count=10, vector_size=self.embedding_size, window=6
+            )
+        else:
+            model = gensim.models.Word2Vec.load(from_path)
         return model
 
     def get_vector(self, domain, entity):
@@ -708,10 +711,13 @@ class VibeSpace(object):
             print(f"{similar_entities[-i - 1]}: {similarity_scores[-i - 1]}")
         print("\n")
 
-    def generate_1vsRest(self, domain, meta, n=10):
+    def generate_1vsRest(self, domain, meta, n=10, min_tag_count=1):
         print(f"\nGenerating 1vsRest for {domain}...")
         tags = [self.meta_files[domain][self.common_to_ent[domain][n]][meta] for n in self.vibespaces[domain].wv.index_to_key]
         tags = [t if t is not None else [] for t in tags]
+        tag_count = dict(Counter([item for sublist in tags for item in sublist]).most_common())
+        valid_tags = [k for k, v in tag_count.items() if v > min_tag_count]
+        tags = [[t for t in T if t in valid_tags] for T in tags]
         has_tags = [t != [] for t in tags]
         x = self.vibespaces[domain].wv.vectors[has_tags]
         all_tags = list(itertools.chain(*tags))
@@ -720,7 +726,8 @@ class VibeSpace(object):
             y = np.array([c[0] in t for t in tags])[has_tags]
             reg = SVC(kernel='linear',
                       class_weight='balanced',
-                      C=10.) #also try non-linear
+                      #C=10.
+                      ) #also try non-linear
             reg.fit(x, y)
             yhat = reg.predict(x)
             f1 = f1_score(y, yhat)
@@ -873,16 +880,17 @@ if __name__ == "__main__":
         meta_files=meta_files,
         common_name_functions=common_name_functions,
         similarity_metric="cosine",
-        embedding_size=32,
-        train_epochs=1,
-        saved_vecspace_models=[],
-        # saved_vecspace_models=saved_vecspace_models,
-        load_mapper_weights=False,
+        embedding_size=1028,
+        train_epochs=100,
+        # saved_vecspace_models=[],
+        saved_vecspace_models=saved_vecspace_models,
+        load_mapper_weights=True,
         mapping_files=mapping_files,
     )
 
-    vibespace.generate_1vsRest("book", "subjects")
-    vibespace.generate_1vsRest("song", "tags")
-    vibespace.generate_1vsRest("movie", "genres")
+    vibespace.generate_1vsRest("book", "subjects", min_tag_count=900)
+    # # vibespace.generate_1vsRest("book", "ol_genre", min_tag_count=1000)
+    vibespace.generate_1vsRest("song", "tags", min_tag_count=1000)
+    vibespace.generate_1vsRest("movie", "genres", min_tag_count=1000)
 
     vibespace.run()
