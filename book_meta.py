@@ -51,18 +51,20 @@ def get_book_genre_from_openlibrary(isbn):
     return f"Failed after {max_errors} attempts with error code: {response.status_code}"
 
 
-book_meta = load_json("meta/book_meta.json")
+book_meta = load_json("meta/book_meta_updated.json")
 reduced_book_meta = {k: v for k, v in book_meta.items() if not(v["isbn_10"] == "" and v["isbn_13"] == "")}
 
 for i, k in enumerate(tqdm(book_meta.keys())):
-    if book_meta[k]["isbn_10"] != "":
-        genre = get_book_genre_from_openlibrary(book_meta[k]["isbn_10"])
-        if genre == "No genre information available." or genre == "book not found.":
-            genre = None
-        else:
-            genre = [g.strip() for g in genre.lower().split(",")]
-            book_meta[k]["ol_genre"] = genre
-            # print(f"{i}: {k}: \n     Genre was {book_meta[k]['subjects']} \n     Genre is now {genre}")
-        if i % 1000 == 0 and i > 0:
-            with open("meta/book_meta_updated.json", 'w') as json_file:
-                json.dump(book_meta, json_file, indent=4)  # indent=4 makes the file pretty-printed
+    if "ol_genre" not in book_meta[k].keys():  
+        if book_meta[k]["isbn_10"] != "":
+            genre = get_book_genre_from_openlibrary(book_meta[k]["isbn_10"])
+            if genre == "No genre information available." or genre == "book not found.":
+                genre = None
+                book_meta[k]["ol_genre"] = None
+            else:
+                genre = [g.strip() for g in genre.lower().split(",")]
+                book_meta[k]["ol_genre"] = genre
+                # print(f"{i}: {k}: \n     Genre was {book_meta[k]['subjects']} \n     Genre is now {genre}")
+            if i % 1000 == 0 and i > 0:
+                with open("meta/book_meta_updated.json", 'w') as json_file:
+                    json.dump(book_meta, json_file, indent=4)  # indent=4 makes the file pretty-printed
