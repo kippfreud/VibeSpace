@@ -891,8 +891,9 @@ if __name__ == "__main__":
         meta_files=meta_files,
         common_name_functions=common_name_functions,
         similarity_metric="cosine",
-        min_num_occurunces=5,
-        embedding_size=512,
+        min_num_occurunces=1,
+        num_permutations=5,
+        embedding_size=1028,
         train_epochs=1,
         saved_vecspace_models=[],
         # saved_vecspace_models=saved_vecspace_models,
@@ -900,8 +901,8 @@ if __name__ == "__main__":
         mapping_files=mapping_files,
     )
 
-    vibespace.generate_1vsRest("book", "subjects", min_tag_count=100)
-    # vibespace.generate_1vsRest("book", "ol_genre", min_tag_count=1)
+    vibespace.generate_1vsRest("book", "subjects", min_tag_count=250)
+    vibespace.generate_1vsRest("book", "ol_genre", min_tag_count=500)
     # vibespace.generate_1vsRest("song", "tags", min_tag_count=1)
     # vibespace.generate_1vsRest("movie", "genres", min_tag_count=1)
 
